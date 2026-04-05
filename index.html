@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>大气物理学刷题 Demo</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --line:#e6ebf2; --text:#1f2937; --muted:#667085;
+    --primary:#2563eb; --primary-soft:#dbeafe; --ok:#16a34a; --ok-soft:#dcfce7;
+    --bad:#dc2626; --bad-soft:#fee2e2; --warn:#d97706; --shadow:0 10px 30px rgba(15,23,42,.08);
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;background:linear-gradient(180deg,#f8fbff,#f5f7fb);color:var(--text)}
+  .wrap{max-width:980px;margin:0 auto;padding:16px 14px 40px}
+  .hero{background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border-radius:24px;padding:20px 18px;box-shadow:var(--shadow)}
+  .hero h1{margin:0 0 8px;font-size:26px}
+  .hero p{margin:0;opacity:.92;line-height:1.55}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+  .stat{background:rgba(255,255,255,.14);backdrop-filter: blur(6px);padding:12px;border-radius:16px}
+  .stat .n{font-size:22px;font-weight:800;margin-bottom:4px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-top:14px}
+  .toolbar{display:grid;grid-template-columns:1.2fr 1fr 1fr auto auto;gap:10px;align-items:center}
+  select,input,textarea,button{font:inherit}
+  select,input,textarea{
+    width:100%;border:1px solid #d7deea;background:#fff;border-radius:14px;padding:12px 14px;outline:none
+  }
+  textarea{min-height:110px;resize:vertical;line-height:1.6}
+  button{
+    border:0;border-radius:14px;padding:12px 14px;font-weight:700;cursor:pointer;transition:.18s transform,.18s opacity,.18s background
+  }
+  button:active{transform:scale(.98)}
+  .btn-primary{background:var(--primary);color:#fff}
+  .btn-ghost{background:#eef2ff;color:#31415e}
+  .btn-soft{background:#f3f6fb;color:#31415e}
+  .btn-danger{background:#fef2f2;color:#b91c1c}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .chip{padding:8px 12px;border-radius:999px;background:#f3f6fb;color:#475467;font-size:13px}
+  .question-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+  .qno{font-weight:800;color:var(--primary)}
+  .qtype{font-size:13px;background:var(--primary-soft);color:#1d4ed8;padding:6px 10px;border-radius:999px}
+  .question{font-size:19px;line-height:1.75;margin:6px 0 12px;white-space:pre-wrap}
+  .question-image-wrap{margin:0 0 14px}
+  .question-image-wrap summary{cursor:pointer;color:#1d4ed8;font-weight:700;margin-bottom:8px}
+  .question-image{width:100%;max-width:760px;border:1px solid #d9e2f0;border-radius:16px;display:block;background:#fff}
+  .tip{margin:0 0 10px;padding:10px 12px;border-radius:12px;background:#fff7ed;color:#9a3412;font-size:13px;line-height:1.6}
+  .option-list{display:grid;gap:10px}
+  .option{
+    border:1px solid #d9e2f0;background:#fff;padding:14px;border-radius:16px;display:flex;gap:12px;align-items:flex-start;cursor:pointer
+  }
+  .option:hover{background:#f8fbff}
+  .option.active{border-color:#3b82f6;background:#eef5ff}
+  .mark{width:28px;height:28px;display:inline-grid;place-items:center;border-radius:50%;background:#edf2f7;color:#3b4a5c;font-weight:800;flex:0 0 28px}
+  .option.active .mark{background:#2563eb;color:#fff}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .result{margin-top:14px;padding:14px;border-radius:16px;line-height:1.7}
+  .ok{background:var(--ok-soft);color:#166534}
+  .bad{background:var(--bad-soft);color:#991b1b}
+  .muted{color:var(--muted)}
+  .small{font-size:13px}
+  .hidden{display:none}
+  .wrong-list{display:grid;gap:10px}
+  .wrong-item{border:1px solid var(--line);border-radius:16px;padding:14px}
+  .wrong-item h4{margin:0 0 6px}
+  .footer{margin-top:20px;color:#667085;font-size:13px;line-height:1.7}
+  .seg{display:inline-flex;background:#eef2f7;border-radius:12px;padding:4px}
+  .seg button{padding:9px 12px;border-radius:10px;background:transparent}
+  .seg button.active{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  @media (max-width:760px){
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .toolbar{grid-template-columns:1fr 1fr}
+    .toolbar > *:nth-child(5){grid-column:span 2}
+    .question{font-size:18px}
+    .hero h1{font-size:23px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <h1>大气物理学刷题 Demo</h1>
+    <p>只保留两类题：290道选择题 + 全部填空题。已重新整理题目与答案，修复了大部分 PDF 提取错位问题；提交后立即判分，不再二次询问；支持上一题/下一题、顺序/随机刷题、错题本和错题次数统计，进度保存在本机浏览器。</p>
+    <div class="stats">
+      <div class="stat"><div class="n" id="sChoice">290</div><div>选择题</div></div>
+      <div class="stat"><div class="n" id="sBlank">53</div><div>填空题</div></div>
+      <div class="stat"><div class="n" id="sWrong">0</div><div>错题数</div></div>
+      <div class="stat"><div class="n" id="sDone">0</div><div>已作答</div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="toolbar">
+      <select id="modeSelect">
+        <option value="choice">选择题</option>
+        <option value="blank">填空题</option>
+      </select>
+      <div class="seg">
+        <button id="orderBtn" class="active" type="button">顺序</button>
+        <button id="randomBtn" type="button">随机</button>
+      </div>
+      <input id="jumpInput" type="number" min="1" placeholder="跳转题号" />
+      <button class="btn-ghost" id="jumpBtn" type="button">跳转</button>
+      <button class="btn-soft" id="wrongOnlyBtn" type="button">只刷错题</button>
+    </div>
+    <div class="chips">
+      <span class="chip" id="progressChip">当前：选择题 1 / 290</span>
+      <span class="chip" id="accuracyChip">本类正确率：0%</span>
+      <span class="chip" id="statusChip">模式：顺序</span>
+    </div>
+  </section>
+
+  <section class="card" id="quizCard">
+    <div class="question-head">
+      <div>
+        <div class="qno" id="qNo">第 1 题</div>
+        <div class="muted small" id="qId">MC001</div>
+      </div>
+      <div class="qtype" id="qType">选择题</div>
+    </div>
+    <div class="question" id="qText"></div>
+
+    <div id="questionImageWrap" class="question-image-wrap hidden">
+      <details>
+        <summary>查看该题所在页原图</summary>
+        <img id="questionImage" class="question-image" alt="题目原图" />
+      </details>
+    </div>
+
+    <div id="multiTip" class="tip hidden">这题是多选题，请把所有正确选项都选上后再提交。</div>
+
+    <div id="choiceArea" class="option-list"></div>
+
+    <div id="blankArea" class="hidden">
+      <textarea id="blankInput" placeholder="请输入答案。填空题默认采用较宽松的关键词匹配。"></textarea>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" id="submitBtn" type="button">确认提交</button>
+      <button class="btn-ghost" id="showAnswerBtn" type="button">直接看答案</button>
+      <button class="btn-soft" id="prevBtn" type="button">上一题</button>
+      <button class="btn-soft" id="nextBtn" type="button">下一题</button>
+      <button class="btn-soft" id="resetCurrentBtn" type="button">清空作答</button>
+    </div>
+
+    <div id="resultBox" class="result hidden"></div>
+  </section>
+
+  <section class="card">
+    <div class="inline" style="justify-content:space-between">
+      <h3 style="margin:0">错题本</h3>
+      <div class="inline">
+        <button class="btn-soft" id="refreshWrongBtn" type="button">刷新</button>
+        <button class="btn-danger" id="clearWrongBtn" type="button">清空错题记录</button>
+      </div>
+    </div>
+    <div id="wrongList" class="wrong-list" style="margin-top:12px"></div>
+  </section>
+
+  <div class="footer">
+    说明：部分图形题增加了“查看该题所在页原图”，方便你对照原 PDF。题库与答案均为本地静态文件，直接双击打开 <code>index.html</code> 即可使用。
+  </div>
+</div>
+
+<script src="quiz_data.js"></script>
+<script>
+const data = window.QUIZ_DATA;
+const STORAGE_KEY = 'atmos_quiz_demo_v2';
+const state = loadState();
+
+const els = {
+  modeSelect: document.getElementById('modeSelect'),
+  orderBtn: document.getElementById('orderBtn'),
+  randomBtn: document.getElementById('randomBtn'),
+  jumpInput: document.getElementById('jumpInput'),
+  jumpBtn: document.getElementById('jumpBtn'),
+  wrongOnlyBtn: document.getElementById('wrongOnlyBtn'),
+  progressChip: document.getElementById('progressChip'),
+  accuracyChip: document.getElementById('accuracyChip'),
+  statusChip: document.getElementById('statusChip'),
+  qNo: document.getElementById('qNo'),
+  qId: document.getElementById('qId'),
+  qType: document.getElementById('qType'),
+  qText: document.getElementById('qText'),
+  questionImageWrap: document.getElementById('questionImageWrap'),
+  questionImage: document.getElementById('questionImage'),
+  multiTip: document.getElementById('multiTip'),
+  choiceArea: document.getElementById('choiceArea'),
+  blankArea: document.getElementById('blankArea'),
+  blankInput: document.getElementById('blankInput'),
+  submitBtn: document.getElementById('submitBtn'),
+  showAnswerBtn: document.getElementById('showAnswerBtn'),
+  prevBtn: document.getElementById('prevBtn'),
+  nextBtn: document.getElementById('nextBtn'),
+  resetCurrentBtn: document.getElementById('resetCurrentBtn'),
+  resultBox: document.getElementById('resultBox'),
+  wrongList: document.getElementById('wrongList'),
+  refreshWrongBtn: document.getElementById('refreshWrongBtn'),
+  clearWrongBtn: document.getElementById('clearWrongBtn'),
+  sChoice: document.getElementById('sChoice'),
+  sBlank: document.getElementById('sBlank'),
+  sWrong: document.getElementById('sWrong'),
+  sDone: document.getElementById('sDone')
+};
+
+init();
+
+function init(){
+  els.sChoice.textContent = data.meta.choiceCount;
+  els.sBlank.textContent = data.meta.blankCount;
+  els.modeSelect.value = state.mode;
+  syncModeButtons();
+  bindEvents();
+  renderQuestion();
+  renderWrongList();
+  renderStats();
+}
+
+function defaultState(){
+  return {
+    mode: 'choice',
+    random: false,
+    wrongOnly: false,
+    indexMap: { choice: 0, blank: 0 },
+    history: {},
+    answers: {}
+  };
+}
+function loadState(){
+  try{
+    return Object.assign(defaultState(), JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'));
+  }catch(e){
+    return defaultState();
+  }
+}
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function getList(){
+  let list = data.questions[state.mode].slice();
+  if(state.wrongOnly){
+    list = list.filter(q => (state.history[q.id]?.wrongCount || 0) > 0);
+  }
+  return list;
+}
+function currentIndex(){
+  const max = Math.max(getList().length - 1, 0);
+  const idx = state.indexMap[state.mode] || 0;
+  return Math.min(idx, max);
+}
+function currentQuestion(){
+  const list = getList();
+  if(!list.length) return null;
+  return list[currentIndex()];
+}
+function goNext(){
+  const list = getList();
+  if(!list.length) return;
+  if(state.random){
+    state.indexMap[state.mode] = Math.floor(Math.random() * list.length);
+  }else{
+    state.indexMap[state.mode] = (currentIndex() + 1) % list.length;
+  }
+  saveState();
+  renderQuestion();
+}
+function goPrev(){
+  const list = getList();
+  if(!list.length) return;
+  if(state.random){
+    state.indexMap[state.mode] = Math.floor(Math.random() * list.length);
+  }else{
+    state.indexMap[state.mode] = (currentIndex() - 1 + list.length) % list.length;
+  }
+  saveState();
+  renderQuestion();
+}
+function jumpTo(no){
+  const list = getList();
+  const idx = list.findIndex(q => q.number === Number(no));
+  if(idx === -1){
+    alert('当前题库模式下没有这个题号。');
+    return;
+  }
+  state.indexMap[state.mode] = idx;
+  saveState();
+  renderQuestion();
+}
+function syncModeButtons(){
+  els.orderBtn.classList.toggle('active', !state.random);
+  els.randomBtn.classList.toggle('active', state.random);
+}
+function isMultiChoice(q){
+  return q.type === 'choice' && String(q.answer || '').length > 1;
+}
+function getStoredChoiceAnswer(q){
+  const val = state.answers[q.id];
+  if(Array.isArray(val)) return val.slice().sort().join('');
+  return String(val || '');
+}
+function renderQuestion(){
+  const q = currentQuestion();
+  const list = getList();
+  if(!q){
+    els.qNo.textContent = '暂无题目';
+    els.qText.textContent = state.wrongOnly ? '当前没有错题。' : '没有可显示的题目。';
+    els.choiceArea.innerHTML = '';
+    els.blankInput.value = '';
+    els.blankArea.classList.add('hidden');
+    els.questionImageWrap.classList.add('hidden');
+    els.multiTip.classList.add('hidden');
+    els.resultBox.classList.add('hidden');
+    updateChips(0,0);
+    return;
+  }
+  els.qNo.textContent = `第 ${q.number} 题`;
+  els.qId.textContent = q.id;
+  els.qType.textContent = isMultiChoice(q) ? '多选题' : (q.type === 'choice' ? '选择题' : '填空题');
+  els.qText.textContent = q.question;
+  els.resultBox.classList.add('hidden');
+  els.resultBox.innerHTML = '';
+
+  if(q.image){
+    els.questionImage.src = q.image;
+    els.questionImage.alt = q.imageAlt || '题目原图';
+    els.questionImageWrap.classList.remove('hidden');
+  }else{
+    els.questionImageWrap.classList.add('hidden');
+    els.questionImage.removeAttribute('src');
+  }
+
+  els.multiTip.classList.toggle('hidden', !isMultiChoice(q));
+
+  if(q.type === 'choice'){
+    els.choiceArea.innerHTML = '';
+    els.choiceArea.classList.remove('hidden');
+    els.blankArea.classList.add('hidden');
+    const saved = state.answers[q.id] || (isMultiChoice(q) ? [] : '');
+    const selectedSet = new Set(Array.isArray(saved) ? saved : [saved].filter(Boolean));
+    q.options.forEach(opt => {
+      const div = document.createElement('div');
+      div.className = 'option' + (selectedSet.has(opt.label) ? ' active' : '');
+      div.dataset.value = opt.label;
+      div.innerHTML = `<div class="mark">${opt.label}</div><div>${escapeHtml(opt.text || ('选项 ' + opt.label))}</div>`;
+      div.addEventListener('click', () => {
+        if(isMultiChoice(q)){
+          const arr = Array.isArray(state.answers[q.id]) ? state.answers[q.id].slice() : [];
+          const idx = arr.indexOf(opt.label);
+          if(idx >= 0) arr.splice(idx,1); else arr.push(opt.label);
+          arr.sort();
+          state.answers[q.id] = arr;
+        }else{
+          state.answers[q.id] = opt.label;
+        }
+        saveState();
+        renderQuestion();
+      });
+      els.choiceArea.appendChild(div);
+    });
+  }else{
+    els.choiceArea.classList.add('hidden');
+    els.blankArea.classList.remove('hidden');
+    els.blankInput.value = state.answers[q.id] || '';
+  }
+  updateChips(currentIndex()+1, list.length);
+  renderStats();
+}
+function updateChips(pos,total){
+  const label = state.mode === 'choice' ? '选择题' : '填空题';
+  els.progressChip.textContent = total ? `当前：${label} ${pos} / ${total}` : `当前：${label} 0 / 0`;
+  const items = data.questions[state.mode];
+  const stats = items.reduce((acc,q) => {
+    const h = state.history[q.id];
+    if(h?.attempts){ acc.attempts += h.attempts; acc.correct += h.correct || 0; }
+    return acc;
+  }, {attempts:0, correct:0});
+  const rate = stats.attempts ? Math.round(stats.correct / stats.attempts * 100) : 0;
+  els.accuracyChip.textContent = `本类正确率：${rate}%`;
+  els.statusChip.textContent = `模式：${state.random ? '随机' : '顺序'}${state.wrongOnly ? '｜只刷错题' : ''}`;
+}
+function recordAttempt(q, userAnswer, isCorrect){
+  const h = state.history[q.id] || {attempts:0, correct:0, wrong:0, wrongCount:0, lastUserAnswer:''};
+  h.attempts += 1;
+  h.lastUserAnswer = userAnswer;
+  if(isCorrect){
+    h.correct += 1;
+  }else{
+    h.wrong += 1;
+    h.wrongCount += 1;
+  }
+  state.history[q.id] = h;
+  state.answers[q.id] = isMultiChoice(q) ? String(userAnswer).split('') : userAnswer;
+  saveState();
+}
+function normalizeText(s){
+  return (s || '')
+    .toLowerCase()
+    .replace(/[，,。.;；:：、（）()\[\]\s]/g,'')
+    .replace(/或/g,'')
+    .replace(/的/g,'');
+}
+function blankIsCorrect(user, answer){
+  const u = normalizeText(user);
+  const a = normalizeText(answer);
+  if(!u) return false;
+  if(u === a || a.includes(u) || u.includes(a)) return true;
+  const tokens = answer
+    .replace(/（.*?）|\(.*?\)/g,' ')
+    .split(/[、，,;；。:\s]+/)
+    .map(x => normalizeText(x))
+    .filter(x => x && x.length >= 1 && !/^(或|任意写出其中的三种|可在|任选三个)$/.test(x));
+  const uniq = [...new Set(tokens)];
+  if(!uniq.length) return false;
+  let hit = 0;
+  uniq.forEach(t => { if(u.includes(t)) hit += 1; });
+  return hit / uniq.length >= 0.6 || (uniq.length <= 2 && hit >= 1);
+}
+function submitCurrent(){
+  const q = currentQuestion();
+  if(!q) return;
+  let userAnswer = '';
+  if(q.type === 'choice'){
+    if(isMultiChoice(q)){
+      const arr = Array.isArray(state.answers[q.id]) ? state.answers[q.id].slice().sort() : [];
+      if(!arr.length){ alert('请先选择答案。'); return; }
+      userAnswer = arr.join('');
+    }else{
+      userAnswer = state.answers[q.id] || '';
+      if(!userAnswer){ alert('请先选择一个答案。'); return; }
+    }
+  }else{
+    userAnswer = els.blankInput.value.trim();
+    if(!userAnswer){ alert('请先输入答案。'); return; }
+  }
+  const correct = q.type === 'choice'
+    ? normalizeText(userAnswer) === normalizeText(q.answer)
+    : blankIsCorrect(userAnswer, q.answer);
+
+  recordAttempt(q, userAnswer, correct);
+  showResult(q, userAnswer, correct, false);
+  renderWrongList();
+  renderStats();
+}
+function showAnswerDirect(){
+  const q = currentQuestion();
+  if(!q) return;
+  showResult(q, getStoredChoiceAnswer(q) || state.answers[q.id] || '', false, true);
+}
+function showResult(q, userAnswer, correct, directView){
+  els.resultBox.classList.remove('hidden');
+  els.resultBox.className = 'result ' + (directView ? 'ok' : (correct ? 'ok' : 'bad'));
+  const wrongTimes = state.history[q.id]?.wrongCount || 0;
+  const answerHtml = q.type === 'choice'
+    ? `正确答案：<strong>${escapeHtml(q.answer)}</strong>${resolveChoiceText(q)}`
+    : `参考答案：<strong>${escapeHtml(q.answer)}</strong>`;
+  const yourHtml = userAnswer ? `<div>你的答案：<strong>${escapeHtml(Array.isArray(userAnswer) ? userAnswer.join('') : userAnswer)}</strong></div>` : '';
+  const topLine = directView
+    ? `<div><strong>已显示答案</strong></div>`
+    : (correct ? `<div><strong>回答正确</strong></div>` : `<div><strong>回答错误</strong></div>`);
+  els.resultBox.innerHTML = `
+    ${topLine}
+    ${yourHtml}
+    <div>${answerHtml}</div>
+    <div class="small muted" style="margin-top:8px">错题累计次数：${wrongTimes}</div>
+  `;
+}
+function resolveChoiceText(q){
+  const labels = String(q.answer || '').split('');
+  const items = labels.map(label => {
+    const matched = q.options.find(x => x.label === label);
+    if(matched && matched.text && !/^选项 [A-F]$/.test(matched.text) && matched.text !== label){
+      return `${label}（${escapeHtml(matched.text)}）`;
+    }
+    return label;
+  });
+  return items.length ? `：${items.join('；')}` : '';
+}
+function renderWrongList(){
+  const entries = [...Object.entries(state.history)]
+    .filter(([,v]) => (v.wrongCount || 0) > 0)
+    .sort((a,b) => (b[1].wrongCount||0) - (a[1].wrongCount||0));
+  els.wrongList.innerHTML = '';
+  if(!entries.length){
+    els.wrongList.innerHTML = `<div class="muted">暂无错题记录。</div>`;
+    return;
+  }
+  entries.forEach(([id,info]) => {
+    const q = findById(id);
+    if(!q) return;
+    const div = document.createElement('div');
+    div.className = 'wrong-item';
+    div.innerHTML = `
+      <h4>${isMultiChoice(q) ? '多选题' : (q.type === 'choice' ? '选择题' : '填空题')} 第 ${q.number} 题</h4>
+      <div class="small muted">${id}</div>
+      <div style="margin:8px 0 10px;line-height:1.7">${escapeHtml(q.question)}</div>
+      <div class="small">错题次数：<strong>${info.wrongCount || 0}</strong></div>
+      <div class="small">最近一次作答：${escapeHtml(info.lastUserAnswer || '—')}</div>
+      <div class="small">正确答案：${escapeHtml(q.answer)}</div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn-soft" type="button" onclick="openQuestion('${id}')">打开这题</button>
+      </div>
+    `;
+    els.wrongList.appendChild(div);
+  });
+}
+function openQuestion(id){
+  const q = findById(id);
+  if(!q) return;
+  state.mode = q.type;
+  state.wrongOnly = false;
+  els.modeSelect.value = state.mode;
+  const list = getList();
+  state.indexMap[state.mode] = list.findIndex(x => x.id === id);
+  saveState();
+  syncModeButtons();
+  renderQuestion();
+}
+window.openQuestion = openQuestion;
+
+function findById(id){
+  return [...data.questions.choice, ...data.questions.blank].find(q => q.id === id);
+}
+function renderStats(){
+  const all = [...data.questions.choice, ...data.questions.blank];
+  let wrong = 0, done = 0;
+  all.forEach(q => {
+    const h = state.history[q.id];
+    if(h?.attempts) done += 1;
+    if((h?.wrongCount || 0) > 0) wrong += 1;
+  });
+  els.sWrong.textContent = wrong;
+  els.sDone.textContent = done;
+}
+function bindEvents(){
+  els.modeSelect.addEventListener('change', e => {
+    state.mode = e.target.value;
+    saveState();
+    renderQuestion();
+  });
+  els.orderBtn.addEventListener('click', () => { state.random = false; saveState(); syncModeButtons(); renderQuestion(); });
+  els.randomBtn.addEventListener('click', () => { state.random = true; state.indexMap[state.mode] = Math.floor(Math.random()*Math.max(getList().length,1)); saveState(); syncModeButtons(); renderQuestion(); });
+  els.jumpBtn.addEventListener('click', () => jumpTo(els.jumpInput.value));
+  els.jumpInput.addEventListener('keydown', e => { if(e.key === 'Enter') jumpTo(els.jumpInput.value); });
+  els.wrongOnlyBtn.addEventListener('click', () => {
+    state.wrongOnly = !state.wrongOnly;
+    state.indexMap[state.mode] = 0;
+    els.wrongOnlyBtn.textContent = state.wrongOnly ? '退出只刷错题' : '只刷错题';
+    saveState();
+    renderQuestion();
+  });
+  els.submitBtn.addEventListener('click', submitCurrent);
+  els.showAnswerBtn.addEventListener('click', showAnswerDirect);
+  els.prevBtn.addEventListener('click', goPrev);
+  els.nextBtn.addEventListener('click', goNext);
+  els.resetCurrentBtn.addEventListener('click', () => {
+    const q = currentQuestion(); if(!q) return;
+    delete state.answers[q.id]; saveState(); renderQuestion();
+  });
+  els.blankInput.addEventListener('input', e => {
+    const q = currentQuestion(); if(!q) return;
+    state.answers[q.id] = e.target.value; saveState();
+  });
+  els.refreshWrongBtn.addEventListener('click', renderWrongList);
+  els.clearWrongBtn.addEventListener('click', () => {
+    if(!confirm('确定清空所有错题记录和作答历史吗？')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  });
+  els.wrongOnlyBtn.textContent = state.wrongOnly ? '退出只刷错题' : '只刷错题';
+}
+function escapeHtml(str){
+  return String(str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+</script>
+</body>
+</html>
