@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>大气物理 WX个人版权所有</title>
+<title>大气物理 WX版权所有</title>
 <style>
   :root{
     --bg:#f6f8fb; --card:#ffffff; --line:#e6ebf2; --text:#1f2937; --muted:#667085;
@@ -84,8 +84,8 @@
 <body>
 <div class="wrap">
   <section class="hero">
-    <h1>大气物理学刷题 WX个人版权所有</h1>
-    
+    <h1>大气物理 WX版权所有</h1>
+    <p>本版增加了独立入口：主练习、错题练习、收藏练习。清空错题记录和清空收藏夹都不会再清掉当前做题进度、当前答案和浏览位置。</p>
     <div class="stats">
       <div class="stat"><div class="n" id="sChoice">290</div><div>选择题</div></div>
       <div class="stat"><div class="n" id="sBlank">53</div><div>填空题</div></div>
@@ -193,13 +193,9 @@
     </div>
     <div id="favSummary" class="summary-box" style="margin-top:12px"></div>
   </section>
-
-  <div class="footer">
-    长风破浪会有时 直挂云帆济沧海
-  </div>
 </div>
 
-<script src="quiz_data.js?v=6"></script>
+<script src="quiz_data.js?v=9"></script>
 <script>
 const data = window.QUIZ_DATA;
 const STORAGE_KEY = 'atmos_quiz_demo_v4';
@@ -358,9 +354,29 @@ function markScopeCompleted(qid){
   if(!done.includes(qid)) done.push(qid);
 }
 function maybePromptScopeRestart(){
-  if(state.scope === 'main') return false;
   const list = getList();
   if(!list.length) return false;
+
+  if(state.scope === 'main'){
+    const answerStore = state.answers || {};
+    const allDone = list.every(q => {
+      const val = answerStore[q.id];
+      if(q.type === 'choice'){
+        return Array.isArray(val) ? val.length > 0 : !!String(val || '');
+      }
+      return !!String(val || '').trim();
+    });
+    if(!allDone) return false;
+    const yes = confirm('当前主练习已完成，是否从头开始？');
+    if(yes){
+      list.forEach(q => { delete state.answers[q.id]; });
+      setCurrentIndex(0);
+      saveState();
+      renderQuestion();
+    }
+    return true;
+  }
+
   const done = sessionState[state.scope].completed[state.mode];
   const allDone = list.every(q => done.includes(q.id));
   if(!allDone) return false;
@@ -682,7 +698,7 @@ function renderFavSummary(){
   const lastText = lastQ ? `最近收藏的是第 ${lastQ.number} 题。` : '';
   els.favSummary.innerHTML = `
     <div class="summary-title">当前收藏了 ${total} 道题</div>
-    <div>点击“进入收藏练习”</div>
+    <div>点击“进入收藏练习”后，会只刷收藏题，功能与主练习一致。</div>
     <div>在收藏练习中，某题连续 <strong>5</strong> 次答对后，会提示是否将它移出收藏夹。</div>
     <div class="muted">${lastText}</div>
   `;
