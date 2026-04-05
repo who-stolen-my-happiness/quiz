@@ -199,11 +199,15 @@
   </div>
 </div>
 
-<script src="quiz_data.js?v=5"></script>
+<script src="quiz_data.js?v=6"></script>
 <script>
 const data = window.QUIZ_DATA;
 const STORAGE_KEY = 'atmos_quiz_demo_v4';
 const state = loadState();
+const sessionState = {
+  wrong: { answers: {}, completed: { choice: [], blank: [] } },
+  fav: { answers: {}, completed: { choice: [], blank: [] } }
+};
 
 const els = {
   modeSelect: document.getElementById('modeSelect'),
@@ -319,38 +323,15 @@ function toggleFavorite(id){
   saveState();
 }
 function isMultiChoice(q){ return q.type === 'choice' && String(q.answer || '').length > 1; }
+function getAnswerStore(){
+  return state.scope === 'main' ? state.answers : sessionState[state.scope].answers;
+}
 function getStoredChoiceAnswer(q){
-  const val = getCurrentAnswer(q);
+  const val = getAnswerStore()[q.id];
   if(Array.isArray(val)) return val.slice().sort().join('');
   return String(val || '');
 }
 function scopeLabel(scope){ return scope === 'wrong' ? '错题练习' : (scope === 'fav' ? '收藏练习' : '主练习'); }
-
-const practiceDrafts = { wrong: {}, fav: {} };
-function getDraftStore(){ return state.scope === 'main' ? state.answers : (practiceDrafts[state.scope] || {}); }
-function getCurrentAnswer(q){
-  const store = getDraftStore();
-  return store[q.id];
-}
-function setCurrentAnswer(q, val){
-  if(state.scope === 'main'){
-    state.answers[q.id] = val;
-    saveState();
-  }else{
-    practiceDrafts[state.scope][q.id] = val;
-  }
-}
-function clearCurrentAnswer(q){
-  if(state.scope === 'main'){
-    delete state.answers[q.id];
-    saveState();
-  }else{
-    delete practiceDrafts[state.scope][q.id];
-  }
-}
-function clearScopeDrafts(scope){
-  if(scope !== 'main') practiceDrafts[scope] = {};
-}
 
 function getWrongCountdown(id){
   const h = state.history[id] || {};
@@ -361,6 +342,38 @@ function getFavCountdown(id){
   return Math.max(0, 5 - (h.favClearStreak || 0));
 }
 
+function resetScopeSession(scope, mode = null){
+  if(scope === 'main') return;
+  sessionState[scope].answers = {};
+  if(mode){
+    sessionState[scope].completed[mode] = [];
+  }else{
+    sessionState[scope].completed.choice = [];
+    sessionState[scope].completed.blank = [];
+  }
+}
+function markScopeCompleted(qid){
+  if(state.scope === 'main') return;
+  const done = sessionState[state.scope].completed[state.mode];
+  if(!done.includes(qid)) done.push(qid);
+}
+function maybePromptScopeRestart(){
+  if(state.scope === 'main') return false;
+  const list = getList();
+  if(!list.length) return false;
+  const done = sessionState[state.scope].completed[state.mode];
+  const allDone = list.every(q => done.includes(q.id));
+  if(!allDone) return false;
+  const label = state.scope === 'fav' ? '当前收藏题目已完成' : '当前错题已完成';
+  const yes = confirm(`${label}，是否从头开始？`);
+  if(yes){
+    resetScopeSession(state.scope, state.mode);
+    setCurrentIndex(0);
+    saveState();
+    renderQuestion();
+  }
+  return true;
+}
 function renderQuestion(){
   const q = currentQuestion();
   const list = getList();
@@ -399,7 +412,8 @@ function renderQuestion(){
     els.choiceArea.innerHTML = '';
     els.choiceArea.classList.remove('hidden');
     els.blankArea.classList.add('hidden');
-    const saved = getCurrentAnswer(q) || (isMultiChoice(q) ? [] : '');
+    const answerStore = getAnswerStore();
+    const saved = answerStore[q.id] || (isMultiChoice(q) ? [] : '');
     const selected = new Set(Array.isArray(saved) ? saved : [saved].filter(Boolean));
     q.options.forEach(opt => {
       const div = document.createElement('div');
@@ -408,13 +422,14 @@ function renderQuestion(){
       div.innerHTML = `<div class="mark">${opt.label}</div><div>${escapeHtml(opt.text || ('选项 ' + opt.label))}</div>`;
       div.addEventListener('click', () => {
         if(isMultiChoice(q)){
-          const arr = Array.isArray(getCurrentAnswer(q)) ? getCurrentAnswer(q).slice() : [];
+          const answerStore = getAnswerStore();
+          const arr = Array.isArray(answerStore[q.id]) ? answerStore[q.id].slice() : [];
           const i = arr.indexOf(opt.label);
           if(i >= 0) arr.splice(i,1); else arr.push(opt.label);
           arr.sort();
-          setCurrentAnswer(q, arr);
+          answerStore[q.id] = arr;
         }else{
-          setCurrentAnswer(q, opt.label);
+          getAnswerStore()[q.id] = opt.label;
         }
         saveState();
         renderQuestion();
@@ -424,7 +439,7 @@ function renderQuestion(){
   }else{
     els.choiceArea.classList.add('hidden');
     els.blankArea.classList.remove('hidden');
-    els.blankInput.value = getCurrentAnswer(q) || '';
+    els.blankInput.value = getAnswerStore()[q.id] || '';
   }
   updateChips(currentIndex()+1, list.length);
   renderStats();
@@ -475,8 +490,12 @@ function jumpTo(no){
   setCurrentIndex(idx); saveState(); renderQuestion();
 }
 function switchScope(scope){
-  if(scope !== 'main') clearScopeDrafts(scope);
+  const changed = state.scope !== scope;
   state.scope = scope;
+  if(scope !== 'main' && changed){
+    resetScopeSession(scope, state.mode);
+    setCurrentIndex(0);
+  }
   saveState();
   renderQuestion();
 }
@@ -512,6 +531,7 @@ function recordAttempt(q, userAnswer, isCorrect){
   }
   saveState();
 }
+
 function normalizeText(s){
   return (s || '').toLowerCase().replace(/[，,。.;；:：、（）()\[\]\s]/g,'').replace(/或/g,'').replace(/的/g,'');
 }
@@ -529,11 +549,12 @@ function submitCurrent(){
   let userAnswer = '';
   if(q.type === 'choice'){
     if(isMultiChoice(q)){
-      const arr = Array.isArray(getCurrentAnswer(q)) ? getCurrentAnswer(q).slice().sort() : [];
+      const answerStore = getAnswerStore();
+      const arr = Array.isArray(answerStore[q.id]) ? answerStore[q.id].slice().sort() : [];
       if(!arr.length){ alert('请先选择答案。'); return; }
       userAnswer = arr.join('');
     }else{
-      userAnswer = getCurrentAnswer(q) || '';
+      userAnswer = getAnswerStore()[q.id] || '';
       if(!userAnswer){ alert('请先选择一个答案。'); return; }
     }
   }else{
@@ -542,14 +563,21 @@ function submitCurrent(){
   }
   const correct = q.type === 'choice' ? normalizeText(userAnswer) === normalizeText(q.answer) : blankIsCorrect(userAnswer, q.answer);
   recordAttempt(q, userAnswer, correct);
+  markScopeCompleted(q.id);
   maybePromptRemoval(q);
   showResult(q, userAnswer, correct, false);
+  if(state.scope !== 'main'){
+    delete sessionState[state.scope].answers[q.id];
+  }
   renderWrongSummary(); renderFavSummary(); renderStats();
+  if(maybePromptScopeRestart()) return;
   if(!currentQuestion()) renderQuestion();
 }
+
 function showAnswerDirect(){
   const q = currentQuestion(); if(!q) return;
-  showResult(q, getStoredChoiceAnswer(q) || getCurrentAnswer(q) || '', false, true);
+  const store = getAnswerStore();
+  showResult(q, getStoredChoiceAnswer(q) || store[q.id] || '', false, true);
 }
 function showResult(q, userAnswer, correct, directView){
   els.resultBox.classList.remove('hidden');
@@ -671,6 +699,7 @@ function clearWrongRecords(){
     state.history[id] = h;
   });
   if(state.scope === 'wrong') state.scope = 'main';
+  resetScopeSession('wrong');
   saveState();
   renderWrongSummary(); renderQuestion(); renderStats();
 }
@@ -683,6 +712,7 @@ function clearFavoritesOnly(){
     state.history[id] = h;
   });
   if(state.scope === 'fav') state.scope = 'main';
+  resetScopeSession('fav');
   saveState();
   renderFavSummary(); renderQuestion(); renderStats();
 }
@@ -691,8 +721,9 @@ function findById(id){ return [...data.questions.choice, ...data.questions.blank
 function openQuestion(id, scope = 'main'){
   const q = findById(id); if(!q) return;
   state.mode = q.type;
-  if(scope !== 'main') clearScopeDrafts(scope);
+  const changed = state.scope !== scope;
   state.scope = scope;
+  if(scope !== 'main' && changed){ resetScopeSession(scope, q.type); }
   const list = getListFor(q.type, scope);
   const idx = list.findIndex(x => x.id === id);
   state.indexMap[q.type][scope] = Math.max(0, idx);
@@ -728,7 +759,7 @@ function renderStats(){
 }
 
 function bindEvents(){
-  els.modeSelect.addEventListener('change', e => { state.mode = e.target.value; saveState(); renderQuestion(); });
+  els.modeSelect.addEventListener('change', e => { state.mode = e.target.value; if(state.scope !== 'main'){ resetScopeSession(state.scope, state.mode); setCurrentIndex(0); } saveState(); renderQuestion(); });
   els.orderBtn.addEventListener('click', () => { state.random = false; saveState(); syncModeButtons(); renderQuestion(); });
   els.randomBtn.addEventListener('click', () => { state.random = true; const len = getList().length; setCurrentIndex(len ? Math.floor(Math.random()*len) : 0); saveState(); syncModeButtons(); renderQuestion(); });
   els.jumpBtn.addEventListener('click', () => jumpTo(els.jumpInput.value));
@@ -744,8 +775,8 @@ function bindEvents(){
   els.prevBtn.addEventListener('click', goPrev);
   els.nextBtn.addEventListener('click', goNext);
   els.toggleFavBtn.addEventListener('click', () => { const q = currentQuestion(); if(!q) return; toggleFavorite(q.id); const h = state.history[q.id] || {}; if(!isFavorite(q.id)) h.favClearStreak = 0; state.history[q.id] = h; saveState(); renderQuestion(); renderFavSummary(); renderStats(); });
-  els.resetCurrentBtn.addEventListener('click', () => { const q = currentQuestion(); if(!q) return; clearCurrentAnswer(q); renderQuestion(); });
-  els.blankInput.addEventListener('input', e => { const q = currentQuestion(); if(!q) return; setCurrentAnswer(q, e.target.value); });
+  els.resetCurrentBtn.addEventListener('click', () => { const q = currentQuestion(); if(!q) return; delete getAnswerStore()[q.id]; saveState(); renderQuestion(); });
+  els.blankInput.addEventListener('input', e => { const q = currentQuestion(); if(!q) return; getAnswerStore()[q.id] = e.target.value; saveState(); });
   els.clearWrongBtn.addEventListener('click', () => { if(confirm('确定清空错题记录吗？这不会影响当前进度、作答记录和收藏。')) clearWrongRecords(); });
   els.clearFavBtn.addEventListener('click', () => { if(confirm('确定清空收藏夹吗？这不会影响当前进度和作答记录。')) clearFavoritesOnly(); });
 }
