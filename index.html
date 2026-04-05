@@ -85,7 +85,7 @@
 <div class="wrap">
   <section class="hero">
     <h1>大气物理 WX版权所有</h1>
-
+    <p>本版增加了独立入口：主练习、错题练习、收藏练习。清空错题记录和清空收藏夹都不会再清掉当前做题进度、当前答案和浏览位置。</p>
     <div class="stats">
       <div class="stat"><div class="n" id="sChoice">290</div><div>选择题</div></div>
       <div class="stat"><div class="n" id="sBlank">53</div><div>填空题</div></div>
@@ -195,12 +195,13 @@
   </section>
 </div>
 
-<script src="quiz_data.js?v=10"></script>
+<script src="quiz_data.js?v=11"></script>
 <script>
 const data = window.QUIZ_DATA;
 const STORAGE_KEY = 'atmos_quiz_demo_v4';
 const state = loadState();
 const sessionState = {
+  main: { completed: { choice: [], blank: [] } },
   wrong: { answers: {}, completed: { choice: [], blank: [] } },
   fav: { answers: {}, completed: { choice: [], blank: [] } }
 };
@@ -339,8 +340,9 @@ function getFavCountdown(id){
 }
 
 function resetScopeSession(scope, mode = null){
-  if(scope === 'main') return;
-  sessionState[scope].answers = {};
+  if(scope !== 'main'){
+    sessionState[scope].answers = {};
+  }
   if(mode){
     sessionState[scope].completed[mode] = [];
   }else{
@@ -349,40 +351,25 @@ function resetScopeSession(scope, mode = null){
   }
 }
 function markScopeCompleted(qid){
-  if(state.scope === 'main') return;
   const done = sessionState[state.scope].completed[state.mode];
   if(!done.includes(qid)) done.push(qid);
 }
-function maybePromptScopeRestart(){
+function maybePromptScopeRestart(forceLast = false){
   const list = getList();
   if(!list.length) return false;
 
-  if(state.scope === 'main'){
-    const answerStore = state.answers || {};
-    const allDone = list.every(q => {
-      const val = answerStore[q.id];
-      if(q.type === 'choice'){
-        return Array.isArray(val) ? val.length > 0 : !!String(val || '');
-      }
-      return !!String(val || '').trim();
-    });
+  if(!forceLast){
+    const done = sessionState[state.scope].completed[state.mode];
+    const allDone = list.every(q => done.includes(q.id));
     if(!allDone) return false;
-    const yes = confirm('当前主练习已完成，是否从头开始？');
-    if(yes){
-      list.forEach(q => { delete state.answers[q.id]; });
-      setCurrentIndex(0);
-      saveState();
-      renderQuestion();
-    }
-    return true;
   }
 
-  const done = sessionState[state.scope].completed[state.mode];
-  const allDone = list.every(q => done.includes(q.id));
-  if(!allDone) return false;
-  const label = state.scope === 'fav' ? '当前收藏题目已完成' : '当前错题已完成';
+  const label = state.scope === 'main' ? '当前主练习已完成' : (state.scope === 'fav' ? '当前收藏题目已完成' : '当前错题已完成');
   const yes = confirm(`${label}，是否从头开始？`);
   if(yes){
+    if(state.scope === 'main'){
+      list.forEach(q => { delete state.answers[q.id]; });
+    }
     resetScopeSession(state.scope, state.mode);
     setCurrentIndex(0);
     saveState();
@@ -500,7 +487,7 @@ function goNext(){
   const idx = currentIndex();
   const isLast = idx >= list.length - 1;
   if(isLast){
-    if(maybePromptScopeRestart()) return;
+    if(maybePromptScopeRestart(true)) return;
     saveState();
     renderQuestion();
     return;
@@ -603,9 +590,9 @@ function submitCurrent(){
     delete sessionState[state.scope].answers[q.id];
   }
   renderWrongSummary(); renderFavSummary(); renderStats();
-  if(maybePromptScopeRestart()) return;
   if(!currentQuestion()) renderQuestion();
 }
+
 
 function showAnswerDirect(){
   const q = currentQuestion(); if(!q) return;
