@@ -61,6 +61,8 @@
   .entry-btn .desc{font-size:13px;color:#667085;line-height:1.6}
   .wrong-list,.fav-list{display:grid;gap:10px}
   .wrong-item,.fav-item{border:1px solid var(--line);border-radius:16px;padding:14px}
+  .summary-box{border:1px dashed #d9e2f0;border-radius:16px;padding:14px;background:#fafcff;line-height:1.8}
+  .summary-title{font-weight:800;margin-bottom:6px}
   .wrong-item h4,.fav-item h4{margin:0 0 6px}
   .footer{margin-top:20px;color:#667085;font-size:13px;line-height:1.7}
   .seg{display:inline-flex;background:#eef2f7;border-radius:12px;padding:4px}
@@ -174,35 +176,33 @@
     <div class="inline" style="justify-content:space-between">
       <h3 style="margin:0">错题记录</h3>
       <div class="inline">
-        <button class="btn-soft" id="refreshWrongBtn" type="button">刷新</button>
         <button class="btn-soft" id="startWrongBtn" type="button">进入错题练习</button>
         <button class="btn-danger" id="clearWrongBtn" type="button">清空错题记录</button>
       </div>
     </div>
-    <div id="wrongList" class="wrong-list" style="margin-top:12px"></div>
+    <div id="wrongSummary" class="summary-box" style="margin-top:12px"></div>
   </section>
 
   <section class="card">
     <div class="inline" style="justify-content:space-between">
       <h3 style="margin:0">收藏夹</h3>
       <div class="inline">
-        <button class="btn-soft" id="refreshFavBtn" type="button">刷新</button>
         <button class="btn-soft" id="startFavBtn" type="button">进入收藏练习</button>
         <button class="btn-danger" id="clearFavBtn" type="button">清空收藏夹</button>
       </div>
     </div>
-    <div id="favList" class="fav-list" style="margin-top:12px"></div>
+    <div id="favSummary" class="summary-box" style="margin-top:12px"></div>
   </section>
 
   <div class="footer">
-    说明：本版把错题练习和收藏练习做成了单独入口。清空错题记录只会清除错题计数和错题列表，不会清除已作答状态、收藏和当前进度；清空收藏夹只会删除收藏，不会影响作答历史和当前进度。
+    说明：本版保留了主练习、错题练习、收藏练习三个独立入口。页面底部不再展开题目列表，只保留入口与管理功能；在错题练习或收藏练习中，若某题连续 5 次答对，会提示你是否将该题移出对应列表。
   </div>
 </div>
 
-<script src="quiz_data.js?v=4"></script>
+<script src="quiz_data.js?v=5"></script>
 <script>
 const data = window.QUIZ_DATA;
-const STORAGE_KEY = 'atmos_quiz_demo_v3';
+const STORAGE_KEY = 'atmos_quiz_demo_v4';
 const state = loadState();
 
 const els = {
@@ -233,12 +233,10 @@ const els = {
   toggleFavBtn: document.getElementById('toggleFavBtn'),
   resetCurrentBtn: document.getElementById('resetCurrentBtn'),
   resultBox: document.getElementById('resultBox'),
-  wrongList: document.getElementById('wrongList'),
-  refreshWrongBtn: document.getElementById('refreshWrongBtn'),
+  wrongSummary: document.getElementById('wrongSummary'),
   clearWrongBtn: document.getElementById('clearWrongBtn'),
   startWrongBtn: document.getElementById('startWrongBtn'),
-  favList: document.getElementById('favList'),
-  refreshFavBtn: document.getElementById('refreshFavBtn'),
+  favSummary: document.getElementById('favSummary'),
   clearFavBtn: document.getElementById('clearFavBtn'),
   startFavBtn: document.getElementById('startFavBtn'),
   entryMain: document.getElementById('entryMain'),
@@ -287,8 +285,8 @@ function init(){
   syncScopeButtons();
   bindEvents();
   renderQuestion();
-  renderWrongList();
-  renderFavList();
+  renderWrongSummary();
+  renderFavSummary();
   renderStats();
 }
 
@@ -322,11 +320,46 @@ function toggleFavorite(id){
 }
 function isMultiChoice(q){ return q.type === 'choice' && String(q.answer || '').length > 1; }
 function getStoredChoiceAnswer(q){
-  const val = state.answers[q.id];
+  const val = getCurrentAnswer(q);
   if(Array.isArray(val)) return val.slice().sort().join('');
   return String(val || '');
 }
 function scopeLabel(scope){ return scope === 'wrong' ? '错题练习' : (scope === 'fav' ? '收藏练习' : '主练习'); }
+
+const practiceDrafts = { wrong: {}, fav: {} };
+function getDraftStore(){ return state.scope === 'main' ? state.answers : (practiceDrafts[state.scope] || {}); }
+function getCurrentAnswer(q){
+  const store = getDraftStore();
+  return store[q.id];
+}
+function setCurrentAnswer(q, val){
+  if(state.scope === 'main'){
+    state.answers[q.id] = val;
+    saveState();
+  }else{
+    practiceDrafts[state.scope][q.id] = val;
+  }
+}
+function clearCurrentAnswer(q){
+  if(state.scope === 'main'){
+    delete state.answers[q.id];
+    saveState();
+  }else{
+    delete practiceDrafts[state.scope][q.id];
+  }
+}
+function clearScopeDrafts(scope){
+  if(scope !== 'main') practiceDrafts[scope] = {};
+}
+
+function getWrongCountdown(id){
+  const h = state.history[id] || {};
+  return Math.max(0, 5 - (h.wrongClearStreak || 0));
+}
+function getFavCountdown(id){
+  const h = state.history[id] || {};
+  return Math.max(0, 5 - (h.favClearStreak || 0));
+}
 
 function renderQuestion(){
   const q = currentQuestion();
@@ -366,7 +399,7 @@ function renderQuestion(){
     els.choiceArea.innerHTML = '';
     els.choiceArea.classList.remove('hidden');
     els.blankArea.classList.add('hidden');
-    const saved = state.answers[q.id] || (isMultiChoice(q) ? [] : '');
+    const saved = getCurrentAnswer(q) || (isMultiChoice(q) ? [] : '');
     const selected = new Set(Array.isArray(saved) ? saved : [saved].filter(Boolean));
     q.options.forEach(opt => {
       const div = document.createElement('div');
@@ -375,13 +408,13 @@ function renderQuestion(){
       div.innerHTML = `<div class="mark">${opt.label}</div><div>${escapeHtml(opt.text || ('选项 ' + opt.label))}</div>`;
       div.addEventListener('click', () => {
         if(isMultiChoice(q)){
-          const arr = Array.isArray(state.answers[q.id]) ? state.answers[q.id].slice() : [];
+          const arr = Array.isArray(getCurrentAnswer(q)) ? getCurrentAnswer(q).slice() : [];
           const i = arr.indexOf(opt.label);
           if(i >= 0) arr.splice(i,1); else arr.push(opt.label);
           arr.sort();
-          state.answers[q.id] = arr;
+          setCurrentAnswer(q, arr);
         }else{
-          state.answers[q.id] = opt.label;
+          setCurrentAnswer(q, opt.label);
         }
         saveState();
         renderQuestion();
@@ -391,7 +424,7 @@ function renderQuestion(){
   }else{
     els.choiceArea.classList.add('hidden');
     els.blankArea.classList.remove('hidden');
-    els.blankInput.value = state.answers[q.id] || '';
+    els.blankInput.value = getCurrentAnswer(q) || '';
   }
   updateChips(currentIndex()+1, list.length);
   renderStats();
@@ -442,19 +475,41 @@ function jumpTo(no){
   setCurrentIndex(idx); saveState(); renderQuestion();
 }
 function switchScope(scope){
+  if(scope !== 'main') clearScopeDrafts(scope);
   state.scope = scope;
   saveState();
   renderQuestion();
 }
 
 function recordAttempt(q, userAnswer, isCorrect){
-  const h = state.history[q.id] || {attempts:0, correct:0, wrong:0, wrongCount:0, lastUserAnswer:''};
+  const h = state.history[q.id] || {
+    attempts:0, correct:0, wrong:0, wrongCount:0, lastUserAnswer:'',
+    wrongClearStreak:0, favClearStreak:0
+  };
   h.attempts += 1;
   h.lastUserAnswer = userAnswer;
   if(isCorrect) h.correct += 1;
   else { h.wrong += 1; h.wrongCount += 1; }
+
+  const inWrongPool = (h.wrongCount || 0) > 0;
+  const inFavPool = isFavorite(q.id);
+
+  if(inWrongPool){
+    h.wrongClearStreak = isCorrect ? (h.wrongClearStreak || 0) + 1 : 0;
+  }else{
+    h.wrongClearStreak = 0;
+  }
+
+  if(inFavPool){
+    h.favClearStreak = isCorrect ? (h.favClearStreak || 0) + 1 : 0;
+  }else{
+    h.favClearStreak = 0;
+  }
+
   state.history[q.id] = h;
-  state.answers[q.id] = isMultiChoice(q) ? String(userAnswer).split('') : userAnswer;
+  if(state.scope === 'main'){
+    state.answers[q.id] = isMultiChoice(q) ? String(userAnswer).split('') : userAnswer;
+  }
   saveState();
 }
 function normalizeText(s){
@@ -474,11 +529,11 @@ function submitCurrent(){
   let userAnswer = '';
   if(q.type === 'choice'){
     if(isMultiChoice(q)){
-      const arr = Array.isArray(state.answers[q.id]) ? state.answers[q.id].slice().sort() : [];
+      const arr = Array.isArray(getCurrentAnswer(q)) ? getCurrentAnswer(q).slice().sort() : [];
       if(!arr.length){ alert('请先选择答案。'); return; }
       userAnswer = arr.join('');
     }else{
-      userAnswer = state.answers[q.id] || '';
+      userAnswer = getCurrentAnswer(q) || '';
       if(!userAnswer){ alert('请先选择一个答案。'); return; }
     }
   }else{
@@ -487,12 +542,14 @@ function submitCurrent(){
   }
   const correct = q.type === 'choice' ? normalizeText(userAnswer) === normalizeText(q.answer) : blankIsCorrect(userAnswer, q.answer);
   recordAttempt(q, userAnswer, correct);
+  maybePromptRemoval(q);
   showResult(q, userAnswer, correct, false);
-  renderWrongList(); renderFavList(); renderStats();
+  renderWrongSummary(); renderFavSummary(); renderStats();
+  if(!currentQuestion()) renderQuestion();
 }
 function showAnswerDirect(){
   const q = currentQuestion(); if(!q) return;
-  showResult(q, getStoredChoiceAnswer(q) || state.answers[q.id] || '', false, true);
+  showResult(q, getStoredChoiceAnswer(q) || getCurrentAnswer(q) || '', false, true);
 }
 function showResult(q, userAnswer, correct, directView){
   els.resultBox.classList.remove('hidden');
@@ -501,7 +558,62 @@ function showResult(q, userAnswer, correct, directView){
   const answerHtml = q.type === 'choice' ? `正确答案：<strong>${escapeHtml(q.answer)}</strong>${resolveChoiceText(q)}` : `参考答案：<strong>${escapeHtml(q.answer)}</strong>`;
   const yourHtml = userAnswer ? `<div>你的答案：<strong>${escapeHtml(Array.isArray(userAnswer) ? userAnswer.join('') : userAnswer)}</strong></div>` : '';
   const topLine = directView ? `<div><strong>已显示答案</strong></div>` : (correct ? `<div><strong>回答正确</strong></div>` : `<div><strong>回答错误</strong></div>`);
-  els.resultBox.innerHTML = `${topLine}${yourHtml}<div>${answerHtml}</div><div class="small muted" style="margin-top:8px">错题累计次数：${wrongTimes}</div>`;
+  const parts = [`${topLine}${yourHtml}<div>${answerHtml}</div>`, `<div class="small muted" style="margin-top:8px">错题累计次数：${wrongTimes}</div>`];
+  const h = state.history[q.id] || {};
+  if((h.wrongCount || 0) > 0){
+    parts.push(`<div class="small muted">错题移出倒计时：连续再答对 <strong>${getWrongCountdown(q.id)}</strong> 次后可移出错题记录</div>`);
+  }
+  if(isFavorite(q.id)){
+    parts.push(`<div class="small muted">收藏移出倒计时：连续再答对 <strong>${getFavCountdown(q.id)}</strong> 次后可移出收藏夹</div>`);
+  }
+  els.resultBox.innerHTML = parts.join('');
+}
+
+function maybePromptRemoval(q){
+  const h = state.history[q.id] || {};
+  let changed = false;
+
+  if((h.wrongCount || 0) > 0 && (h.wrongClearStreak || 0) >= 5){
+    const yes = confirm(`第 ${q.number} 题已在错题练习相关记录中连续答对 5 次，是否将其移出错题记录？`);
+    if(yes){
+      h.wrong = 0;
+      h.wrongCount = 0;
+      h.wrongClearStreak = 0;
+      changed = true;
+      if(state.scope === 'wrong'){
+        const oldIdx = currentIndex();
+        state.history[q.id] = h;
+        saveState();
+        const lenAfter = getList().length;
+        setCurrentIndex(Math.min(oldIdx, Math.max(lenAfter - 1, 0)));
+      }
+    }else{
+      h.wrongClearStreak = 0;
+      changed = true;
+    }
+  }
+
+  if(isFavorite(q.id) && (h.favClearStreak || 0) >= 5){
+    const yes = confirm(`第 ${q.number} 题已在收藏练习相关记录中连续答对 5 次，是否将其移出收藏夹？`);
+    if(yes){
+      state.favorites = (state.favorites || []).filter(id => id !== q.id);
+      h.favClearStreak = 0;
+      changed = true;
+      if(state.scope === 'fav'){
+        const oldIdx = currentIndex();
+        state.history[q.id] = h;
+        saveState();
+        const lenAfter = getList().length;
+        setCurrentIndex(Math.min(oldIdx, Math.max(lenAfter - 1, 0)));
+      }
+    }else{
+      h.favClearStreak = 0;
+      changed = true;
+    }
+  }
+
+  state.history[q.id] = h;
+  if(changed) saveState();
 }
 function resolveChoiceText(q){
   const labels = String(q.answer || '').split('');
@@ -513,46 +625,39 @@ function resolveChoiceText(q){
   return items.length ? `：${items.join('；')}` : '';
 }
 
-function renderWrongList(){
-  const entries = [...Object.entries(state.history)].filter(([,v]) => (v.wrongCount || 0) > 0).sort((a,b) => (b[1].wrongCount||0) - (a[1].wrongCount||0));
-  els.wrongList.innerHTML = '';
-  if(!entries.length){ els.wrongList.innerHTML = `<div class="muted">暂无错题记录。</div>`; return; }
-  entries.forEach(([id,info]) => {
-    const q = findById(id); if(!q) return;
-    const div = document.createElement('div'); div.className = 'wrong-item';
-    div.innerHTML = `
-      <h4>${isMultiChoice(q) ? '多选题' : (q.type === 'choice' ? '选择题' : '填空题')} 第 ${q.number} 题</h4>
-      <div class="small muted">${id}</div>
-      <div style="margin:8px 0 10px;line-height:1.7">${escapeHtml(q.question)}</div>
-      <div class="small">错题次数：<strong>${info.wrongCount || 0}</strong></div>
-      <div class="small">最近一次作答：${escapeHtml(info.lastUserAnswer || '—')}</div>
-      <div class="small">正确答案：${escapeHtml(q.answer)}</div>
-      <div class="actions" style="margin-top:10px">
-        <button class="btn-soft" type="button" onclick="openQuestion('${id}','wrong')">在错题练习中打开</button>
-      </div>`;
-    els.wrongList.appendChild(div);
-  });
+function renderWrongSummary(){
+  const entries = [...Object.entries(state.history)].filter(([,v]) => (v.wrongCount || 0) > 0);
+  const total = entries.length;
+  if(!total){
+    els.wrongSummary.innerHTML = `<div class="summary-title">当前没有错题</div><div class="muted">你可以直接从上方入口进入主练习；做错的题会自动进入错题记录。</div>`;
+    return;
+  }
+  const hardest = entries.sort((a,b) => (b[1].wrongCount||0) - (a[1].wrongCount||0))[0];
+  const hardestQ = hardest ? findById(hardest[0]) : null;
+  const hardestText = hardestQ ? `当前错题最多的是第 ${hardestQ.number} 题，累计错 ${hardest[1].wrongCount || 0} 次。` : '';
+  els.wrongSummary.innerHTML = `
+    <div class="summary-title">当前共有 ${total} 道错题</div>
+    <div>点击“进入错题练习”后，会只刷错题，功能与主练习一致。</div>
+    <div>在错题练习中，某题连续 <strong>5</strong> 次答对后，会提示是否将它移出错题记录。</div>
+    <div class="muted">${hardestText}</div>
+  `;
 }
-function renderFavList(){
+function renderFavSummary(){
   const favIds = Array.isArray(state.favorites) ? state.favorites : [];
-  els.favList.innerHTML = '';
-  if(!favIds.length){ els.favList.innerHTML = `<div class="muted">暂无收藏题目。</div>`; return; }
-  favIds.forEach(id => {
-    const q = findById(id); if(!q) return;
-    const info = state.history[q.id] || {};
-    const div = document.createElement('div'); div.className = 'fav-item';
-    div.innerHTML = `
-      <h4>${isMultiChoice(q) ? '多选题' : (q.type === 'choice' ? '选择题' : '填空题')} 第 ${q.number} 题</h4>
-      <div class="small muted">${id}</div>
-      <div style="margin:8px 0 10px;line-height:1.7">${escapeHtml(q.question)}</div>
-      <div class="small">正确答案：${escapeHtml(q.answer)}</div>
-      <div class="small">错题次数：<strong>${info.wrongCount || 0}</strong></div>
-      <div class="actions" style="margin-top:10px">
-        <button class="btn-soft" type="button" onclick="openQuestion('${id}','fav')">在收藏练习中打开</button>
-        <button class="btn-danger" type="button" onclick="removeFavorite('${id}')">取消收藏</button>
-      </div>`;
-    els.favList.appendChild(div);
-  });
+  const total = favIds.length;
+  if(!total){
+    els.favSummary.innerHTML = `<div class="summary-title">收藏夹为空</div><div class="muted">做题时点击“收藏本题”即可加入收藏夹，然后从这里进入收藏练习。</div>`;
+    return;
+  }
+  const lastId = favIds[0];
+  const lastQ = findById(lastId);
+  const lastText = lastQ ? `最近收藏的是第 ${lastQ.number} 题。` : '';
+  els.favSummary.innerHTML = `
+    <div class="summary-title">当前收藏了 ${total} 道题</div>
+    <div>点击“进入收藏练习”后，会只刷收藏题，功能与主练习一致。</div>
+    <div>在收藏练习中，某题连续 <strong>5</strong> 次答对后，会提示是否将它移出收藏夹。</div>
+    <div class="muted">${lastText}</div>
+  `;
 }
 
 function clearWrongRecords(){
@@ -562,23 +667,31 @@ function clearWrongRecords(){
     if(!h) return;
     h.wrong = 0;
     h.wrongCount = 0;
+    h.wrongClearStreak = 0;
     state.history[id] = h;
   });
   if(state.scope === 'wrong') state.scope = 'main';
   saveState();
-  renderWrongList(); renderQuestion(); renderStats();
+  renderWrongSummary(); renderQuestion(); renderStats();
 }
 function clearFavoritesOnly(){
   state.favorites = [];
+  Object.keys(state.history || {}).forEach(id => {
+    const h = state.history[id];
+    if(!h) return;
+    h.favClearStreak = 0;
+    state.history[id] = h;
+  });
   if(state.scope === 'fav') state.scope = 'main';
   saveState();
-  renderFavList(); renderQuestion(); renderStats();
+  renderFavSummary(); renderQuestion(); renderStats();
 }
 
 function findById(id){ return [...data.questions.choice, ...data.questions.blank].find(q => q.id === id); }
 function openQuestion(id, scope = 'main'){
   const q = findById(id); if(!q) return;
   state.mode = q.type;
+  if(scope !== 'main') clearScopeDrafts(scope);
   state.scope = scope;
   const list = getListFor(q.type, scope);
   const idx = list.findIndex(x => x.id === id);
@@ -596,7 +709,7 @@ function getListFor(mode, scope){
   return list;
 }
 window.openQuestion = openQuestion;
-function removeFavorite(id){ if(!isFavorite(id)) return; toggleFavorite(id); renderFavList(); renderStats(); if(currentQuestion()?.id === id) renderQuestion(); }
+function removeFavorite(id){ if(!isFavorite(id)) return; toggleFavorite(id); const h = state.history[id] || {}; h.favClearStreak = 0; state.history[id] = h; saveState(); renderFavSummary(); renderStats(); if(currentQuestion()?.id === id) renderQuestion(); }
 window.removeFavorite = removeFavorite;
 
 function renderStats(){
@@ -630,11 +743,9 @@ function bindEvents(){
   els.showAnswerBtn.addEventListener('click', showAnswerDirect);
   els.prevBtn.addEventListener('click', goPrev);
   els.nextBtn.addEventListener('click', goNext);
-  els.toggleFavBtn.addEventListener('click', () => { const q = currentQuestion(); if(!q) return; toggleFavorite(q.id); renderQuestion(); renderFavList(); renderStats(); });
-  els.resetCurrentBtn.addEventListener('click', () => { const q = currentQuestion(); if(!q) return; delete state.answers[q.id]; saveState(); renderQuestion(); });
-  els.blankInput.addEventListener('input', e => { const q = currentQuestion(); if(!q) return; state.answers[q.id] = e.target.value; saveState(); });
-  els.refreshWrongBtn.addEventListener('click', renderWrongList);
-  els.refreshFavBtn.addEventListener('click', renderFavList);
+  els.toggleFavBtn.addEventListener('click', () => { const q = currentQuestion(); if(!q) return; toggleFavorite(q.id); const h = state.history[q.id] || {}; if(!isFavorite(q.id)) h.favClearStreak = 0; state.history[q.id] = h; saveState(); renderQuestion(); renderFavSummary(); renderStats(); });
+  els.resetCurrentBtn.addEventListener('click', () => { const q = currentQuestion(); if(!q) return; clearCurrentAnswer(q); renderQuestion(); });
+  els.blankInput.addEventListener('input', e => { const q = currentQuestion(); if(!q) return; setCurrentAnswer(q, e.target.value); });
   els.clearWrongBtn.addEventListener('click', () => { if(confirm('确定清空错题记录吗？这不会影响当前进度、作答记录和收藏。')) clearWrongRecords(); });
   els.clearFavBtn.addEventListener('click', () => { if(confirm('确定清空收藏夹吗？这不会影响当前进度和作答记录。')) clearFavoritesOnly(); });
 }
