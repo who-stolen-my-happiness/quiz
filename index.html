@@ -195,7 +195,7 @@
   </section>
 </div>
 
-<script src="quiz_data.js?v=9"></script>
+<script src="quiz_data.js?v=10"></script>
 <script>
 const data = window.QUIZ_DATA;
 const STORAGE_KEY = 'atmos_quiz_demo_v4';
@@ -488,10 +488,27 @@ function syncScopeButtons(){
 }
 
 function goNext(){
-  const list = getList(); if(!list.length) return;
-  if(state.random) setCurrentIndex(Math.floor(Math.random()*list.length));
-  else setCurrentIndex((currentIndex()+1) % list.length);
-  saveState(); renderQuestion();
+  const list = getList();
+  if(!list.length) return;
+  if(state.random){
+    setCurrentIndex(Math.floor(Math.random() * list.length));
+    saveState();
+    renderQuestion();
+    return;
+  }
+
+  const idx = currentIndex();
+  const isLast = idx >= list.length - 1;
+  if(isLast){
+    if(maybePromptScopeRestart()) return;
+    saveState();
+    renderQuestion();
+    return;
+  }
+
+  setCurrentIndex(idx + 1);
+  saveState();
+  renderQuestion();
 }
 function goPrev(){
   const list = getList(); if(!list.length) return;
@@ -605,10 +622,10 @@ function showResult(q, userAnswer, correct, directView){
   const parts = [`${topLine}${yourHtml}<div>${answerHtml}</div>`, `<div class="small muted" style="margin-top:8px">错题累计次数：${wrongTimes}</div>`];
   const h = state.history[q.id] || {};
   if((h.wrongCount || 0) > 0){
-    parts.push(`<div class="small muted">错题移出倒计时：连续再答对 <strong>${getWrongCountdown(q.id)}</strong> 次后可移出错题记录</div>`);
+    parts.push(`<div class="small muted">当前该题已做对 <strong>${Math.min(5, h.wrongClearStreak || 0)}/5</strong> 次，满 5 次后可移出错题记录</div>`);
   }
   if(isFavorite(q.id)){
-    parts.push(`<div class="small muted">收藏移出倒计时：连续再答对 <strong>${getFavCountdown(q.id)}</strong> 次后可移出收藏夹</div>`);
+    parts.push(`<div class="small muted">当前该题已做对 <strong>${Math.min(5, h.favClearStreak || 0)}/5</strong> 次，满 5 次后可移出收藏夹</div>`);
   }
   els.resultBox.innerHTML = parts.join('');
 }
