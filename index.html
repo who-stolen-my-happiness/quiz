@@ -17,11 +17,11 @@
   .hero{background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border-radius:24px;padding:20px 18px;box-shadow:var(--shadow)}
   .hero h1{margin:0 0 8px;font-size:26px}
   .hero p{margin:0;opacity:.92;line-height:1.55}
-  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px}
   .stat{background:rgba(255,255,255,.14);backdrop-filter: blur(6px);padding:12px;border-radius:16px}
   .stat .n{font-size:22px;font-weight:800;margin-bottom:4px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-top:14px}
-  .toolbar{display:grid;grid-template-columns:1.2fr 1fr 1fr auto auto;gap:10px;align-items:center}
+  .toolbar{display:grid;grid-template-columns:1.2fr 1fr 1fr auto auto auto;gap:10px;align-items:center}
   select,input,textarea,button{font:inherit}
   select,input,textarea{
     width:100%;border:1px solid #d7deea;background:#fff;border-radius:14px;padding:12px 14px;outline:none
@@ -60,8 +60,8 @@
   .muted{color:var(--muted)}
   .small{font-size:13px}
   .hidden{display:none}
-  .wrong-list{display:grid;gap:10px}
-  .wrong-item{border:1px solid var(--line);border-radius:16px;padding:14px}
+  .wrong-list,.fav-list{display:grid;gap:10px}
+  .wrong-item,.fav-item{border:1px solid var(--line);border-radius:16px;padding:14px}
   .wrong-item h4{margin:0 0 6px}
   .footer{margin-top:20px;color:#667085;font-size:13px;line-height:1.7}
   .seg{display:inline-flex;background:#eef2f7;border-radius:12px;padding:4px}
@@ -71,7 +71,7 @@
   @media (max-width:760px){
     .stats{grid-template-columns:repeat(2,1fr)}
     .toolbar{grid-template-columns:1fr 1fr}
-    .toolbar > *:nth-child(5){grid-column:span 2}
+    .toolbar > *:nth-child(5),.toolbar > *:nth-child(6){grid-column:span 1}
     .question{font-size:18px}
     .hero h1{font-size:23px}
   }
@@ -80,13 +80,14 @@
 <body>
 <div class="wrap">
   <section class="hero">
-    <h1>大气物理学(wx版权所有)</h1>
-    <p>290道选择题 + 全部填空题</p>
+    <h1>大气物理学刷题 Demo</h1>
+    <p>只保留两类题：290道选择题 + 全部填空题。已重新整理题目与答案，修复了大部分 PDF 提取错位问题；提交后立即判分，不再二次询问；支持上一题/下一题、顺序/随机刷题、错题本和错题次数统计，进度保存在本机浏览器。</p>
     <div class="stats">
       <div class="stat"><div class="n" id="sChoice">290</div><div>选择题</div></div>
       <div class="stat"><div class="n" id="sBlank">53</div><div>填空题</div></div>
       <div class="stat"><div class="n" id="sWrong">0</div><div>错题数</div></div>
       <div class="stat"><div class="n" id="sDone">0</div><div>已作答</div></div>
+      <div class="stat"><div class="n" id="sFav">0</div><div>已收藏</div></div>
     </div>
   </section>
 
@@ -103,6 +104,7 @@
       <input id="jumpInput" type="number" min="1" placeholder="跳转题号" />
       <button class="btn-ghost" id="jumpBtn" type="button">跳转</button>
       <button class="btn-soft" id="wrongOnlyBtn" type="button">只刷错题</button>
+      <button class="btn-soft" id="favOnlyBtn" type="button">只看收藏</button>
     </div>
     <div class="chips">
       <span class="chip" id="progressChip">当前：选择题 1 / 290</span>
@@ -141,6 +143,7 @@
       <button class="btn-ghost" id="showAnswerBtn" type="button">直接看答案</button>
       <button class="btn-soft" id="prevBtn" type="button">上一题</button>
       <button class="btn-soft" id="nextBtn" type="button">下一题</button>
+      <button class="btn-soft" id="toggleFavBtn" type="button">收藏本题</button>
       <button class="btn-soft" id="resetCurrentBtn" type="button">清空作答</button>
     </div>
 
@@ -158,12 +161,23 @@
     <div id="wrongList" class="wrong-list" style="margin-top:12px"></div>
   </section>
 
+  <section class="card">
+    <div class="inline" style="justify-content:space-between">
+      <h3 style="margin:0">收藏夹</h3>
+      <div class="inline">
+        <button class="btn-soft" id="refreshFavBtn" type="button">刷新</button>
+        <button class="btn-danger" id="clearFavBtn" type="button">清空收藏</button>
+      </div>
+    </div>
+    <div id="favList" class="fav-list" style="margin-top:12px"></div>
+  </section>
+
   <div class="footer">
-    说明：部分图形题增加了“查看该题所在页原图”，方便对照原 PDF。题库与答案均为本地静态文件，直接双击打开 <code>index.html</code> 即可使用。
+    说明：本版新增了收藏功能和收藏夹，收藏信息与错题记录一样保存在当前浏览器本地。部分图形题增加了“查看该题所在页原图”，方便你对照原 PDF。题库与答案均为本地静态文件，直接双击打开 <code>index.html</code> 即可使用。
   </div>
 </div>
 
-<script src="quiz_data.js"></script>
+<script src="quiz_data.js?v=3"></script>
 <script>
 const data = window.QUIZ_DATA;
 const STORAGE_KEY = 'atmos_quiz_demo_v2';
@@ -176,6 +190,7 @@ const els = {
   jumpInput: document.getElementById('jumpInput'),
   jumpBtn: document.getElementById('jumpBtn'),
   wrongOnlyBtn: document.getElementById('wrongOnlyBtn'),
+  favOnlyBtn: document.getElementById('favOnlyBtn'),
   progressChip: document.getElementById('progressChip'),
   accuracyChip: document.getElementById('accuracyChip'),
   statusChip: document.getElementById('statusChip'),
@@ -193,15 +208,20 @@ const els = {
   showAnswerBtn: document.getElementById('showAnswerBtn'),
   prevBtn: document.getElementById('prevBtn'),
   nextBtn: document.getElementById('nextBtn'),
+  toggleFavBtn: document.getElementById('toggleFavBtn'),
   resetCurrentBtn: document.getElementById('resetCurrentBtn'),
   resultBox: document.getElementById('resultBox'),
   wrongList: document.getElementById('wrongList'),
   refreshWrongBtn: document.getElementById('refreshWrongBtn'),
   clearWrongBtn: document.getElementById('clearWrongBtn'),
+  favList: document.getElementById('favList'),
+  refreshFavBtn: document.getElementById('refreshFavBtn'),
+  clearFavBtn: document.getElementById('clearFavBtn'),
   sChoice: document.getElementById('sChoice'),
   sBlank: document.getElementById('sBlank'),
   sWrong: document.getElementById('sWrong'),
-  sDone: document.getElementById('sDone')
+  sDone: document.getElementById('sDone'),
+  sFav: document.getElementById('sFav')
 };
 
 init();
@@ -214,6 +234,7 @@ function init(){
   bindEvents();
   renderQuestion();
   renderWrongList();
+  renderFavList();
   renderStats();
 }
 
@@ -222,9 +243,11 @@ function defaultState(){
     mode: 'choice',
     random: false,
     wrongOnly: false,
+    favOnly: false,
     indexMap: { choice: 0, blank: 0 },
     history: {},
-    answers: {}
+    answers: {},
+    favorites: []
   };
 }
 function loadState(){
@@ -241,7 +264,20 @@ function getList(){
   if(state.wrongOnly){
     list = list.filter(q => (state.history[q.id]?.wrongCount || 0) > 0);
   }
+  if(state.favOnly){
+    const favSet = new Set(state.favorites || []);
+    list = list.filter(q => favSet.has(q.id));
+  }
   return list;
+}
+function isFavorite(id){
+  return (state.favorites || []).includes(id);
+}
+function toggleFavorite(id){
+  state.favorites = Array.isArray(state.favorites) ? state.favorites : [];
+  const idx = state.favorites.indexOf(id);
+  if(idx >= 0) state.favorites.splice(idx, 1); else state.favorites.unshift(id);
+  saveState();
 }
 function currentIndex(){
   const max = Math.max(getList().length - 1, 0);
@@ -303,7 +339,7 @@ function renderQuestion(){
   const list = getList();
   if(!q){
     els.qNo.textContent = '暂无题目';
-    els.qText.textContent = state.wrongOnly ? '当前没有错题。' : '没有可显示的题目。';
+    els.qText.textContent = state.wrongOnly ? '当前没有错题。' : (state.favOnly ? '当前没有收藏题。' : '没有可显示的题目。');
     els.choiceArea.innerHTML = '';
     els.blankInput.value = '';
     els.blankArea.classList.add('hidden');
@@ -319,6 +355,7 @@ function renderQuestion(){
   els.qText.textContent = q.question;
   els.resultBox.classList.add('hidden');
   els.resultBox.innerHTML = '';
+  els.toggleFavBtn.textContent = isFavorite(q.id) ? '取消收藏' : '收藏本题';
 
   if(q.image){
     els.questionImage.src = q.image;
@@ -376,7 +413,7 @@ function updateChips(pos,total){
   }, {attempts:0, correct:0});
   const rate = stats.attempts ? Math.round(stats.correct / stats.attempts * 100) : 0;
   els.accuracyChip.textContent = `本类正确率：${rate}%`;
-  els.statusChip.textContent = `模式：${state.random ? '随机' : '顺序'}${state.wrongOnly ? '｜只刷错题' : ''}`;
+  els.statusChip.textContent = `模式：${state.random ? '随机' : '顺序'}${state.wrongOnly ? '｜只刷错题' : ''}${state.favOnly ? '｜只看收藏' : ''}`;
 }
 function recordAttempt(q, userAnswer, isCorrect){
   const h = state.history[q.id] || {attempts:0, correct:0, wrong:0, wrongCount:0, lastUserAnswer:''};
@@ -439,6 +476,7 @@ function submitCurrent(){
   recordAttempt(q, userAnswer, correct);
   showResult(q, userAnswer, correct, false);
   renderWrongList();
+  renderFavList();
   renderStats();
 }
 function showAnswerDirect(){
@@ -503,6 +541,42 @@ function renderWrongList(){
     els.wrongList.appendChild(div);
   });
 }
+function renderFavList(){
+  const favIds = Array.isArray(state.favorites) ? state.favorites : [];
+  els.favList.innerHTML = '';
+  if(!favIds.length){
+    els.favList.innerHTML = `<div class="muted">暂无收藏题目。</div>`;
+    return;
+  }
+  favIds.forEach(id => {
+    const q = findById(id);
+    if(!q) return;
+    const info = state.history[q.id] || {};
+    const div = document.createElement('div');
+    div.className = 'fav-item';
+    div.innerHTML = `
+      <h4>${isMultiChoice(q) ? '多选题' : (q.type === 'choice' ? '选择题' : '填空题')} 第 ${q.number} 题</h4>
+      <div class="small muted">${id}</div>
+      <div style="margin:8px 0 10px;line-height:1.7">${escapeHtml(q.question)}</div>
+      <div class="small">正确答案：${escapeHtml(q.answer)}</div>
+      <div class="small">错题次数：<strong>${info.wrongCount || 0}</strong></div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn-soft" type="button" onclick="openQuestion('${id}')">打开这题</button>
+        <button class="btn-danger" type="button" onclick="removeFavorite('${id}')">取消收藏</button>
+      </div>
+    `;
+    els.favList.appendChild(div);
+  });
+}
+function removeFavorite(id){
+  if(!isFavorite(id)) return;
+  toggleFavorite(id);
+  renderFavList();
+  renderStats();
+  if(currentQuestion()?.id === id) renderQuestion();
+}
+window.removeFavorite = removeFavorite;
+
 function openQuestion(id){
   const q = findById(id);
   if(!q) return;
@@ -530,6 +604,7 @@ function renderStats(){
   });
   els.sWrong.textContent = wrong;
   els.sDone.textContent = done;
+  els.sFav.textContent = Array.isArray(state.favorites) ? state.favorites.length : 0;
 }
 function bindEvents(){
   els.modeSelect.addEventListener('change', e => {
@@ -543,7 +618,18 @@ function bindEvents(){
   els.jumpInput.addEventListener('keydown', e => { if(e.key === 'Enter') jumpTo(els.jumpInput.value); });
   els.wrongOnlyBtn.addEventListener('click', () => {
     state.wrongOnly = !state.wrongOnly;
+    if(state.wrongOnly) state.favOnly = false;
     state.indexMap[state.mode] = 0;
+    els.wrongOnlyBtn.textContent = state.wrongOnly ? '退出只刷错题' : '只刷错题';
+    els.favOnlyBtn.textContent = state.favOnly ? '退出只看收藏' : '只看收藏';
+    saveState();
+    renderQuestion();
+  });
+  els.favOnlyBtn.addEventListener('click', () => {
+    state.favOnly = !state.favOnly;
+    if(state.favOnly) state.wrongOnly = false;
+    state.indexMap[state.mode] = 0;
+    els.favOnlyBtn.textContent = state.favOnly ? '退出只看收藏' : '只看收藏';
     els.wrongOnlyBtn.textContent = state.wrongOnly ? '退出只刷错题' : '只刷错题';
     saveState();
     renderQuestion();
@@ -552,6 +638,13 @@ function bindEvents(){
   els.showAnswerBtn.addEventListener('click', showAnswerDirect);
   els.prevBtn.addEventListener('click', goPrev);
   els.nextBtn.addEventListener('click', goNext);
+  els.toggleFavBtn.addEventListener('click', () => {
+    const q = currentQuestion(); if(!q) return;
+    toggleFavorite(q.id);
+    renderQuestion();
+    renderFavList();
+    renderStats();
+  });
   els.resetCurrentBtn.addEventListener('click', () => {
     const q = currentQuestion(); if(!q) return;
     delete state.answers[q.id]; saveState(); renderQuestion();
@@ -561,12 +654,24 @@ function bindEvents(){
     state.answers[q.id] = e.target.value; saveState();
   });
   els.refreshWrongBtn.addEventListener('click', renderWrongList);
+  els.refreshFavBtn.addEventListener('click', renderFavList);
   els.clearWrongBtn.addEventListener('click', () => {
     if(!confirm('确定清空所有错题记录和作答历史吗？')) return;
     localStorage.removeItem(STORAGE_KEY);
     location.reload();
   });
+  els.clearFavBtn.addEventListener('click', () => {
+    if(!confirm('确定清空所有收藏题吗？')) return;
+    state.favorites = [];
+    state.favOnly = false;
+    saveState();
+    renderFavList();
+    renderStats();
+    renderQuestion();
+    els.favOnlyBtn.textContent = '只看收藏';
+  });
   els.wrongOnlyBtn.textContent = state.wrongOnly ? '退出只刷错题' : '只刷错题';
+  els.favOnlyBtn.textContent = state.favOnly ? '退出只看收藏' : '只看收藏';
 }
 function escapeHtml(str){
   return String(str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
